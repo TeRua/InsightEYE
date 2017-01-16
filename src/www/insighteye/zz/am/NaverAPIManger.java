@@ -3,10 +3,12 @@ package www.insighteye.zz.am;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -26,12 +28,15 @@ public class NaverAPIManger {
 	private int maxPage; // 최대 페이지
 	private int total; // 최대 검색 결과
 
+	private String keyword;
 	private String query; // 검색문 쿼리, URLEncoder로 UTF-8 인코딩 필요
 	private StringBuffer response; // 결과 저장 및 반환용 변수
 
 	@SuppressWarnings("finally")
 	public String search(String _keyword) {
+		// Initial Searching for Keyword Input
 		try {
+			keyword = _keyword.replaceAll("\"","");
 			query = URLEncoder.encode(_keyword, "UTF-8");
 			String apiURL = "https://openapi.naver.com/v1/search/news.xml?query="; // 뉴스검색
 			// API URL [XML]
@@ -77,6 +82,7 @@ public class NaverAPIManger {
 	}
 
 	public int getTotal(String xml) {
+		//get Total from search result
 		DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
 		DocumentBuilder dBuilder;
 		Document doc;
@@ -89,7 +95,7 @@ public class NaverAPIManger {
 			NodeList nList = doc.getElementsByTagName("total");
 			if (nList.getLength() != 0) {
 				Node n = nList.item(0);
-				System.out.println(n.getTextContent());
+				System.out.println("Original Total Page is " + n.getTextContent());
 				total = Integer.parseInt(n.getTextContent());
 			}
 		} catch (Exception e) {
@@ -111,6 +117,7 @@ public class NaverAPIManger {
 		return maxPage;
 	}
 
+	//멀티스레딩 시, curPage에 락 걸어야함, 아래의 search() 메소드를 멀티스레딩으로 동작
 	@SuppressWarnings("finally")
 	public String search() {
 		if (curPage > maxPage) {
@@ -157,6 +164,7 @@ public class NaverAPIManger {
 			} catch (Exception e) {
 				System.out.println(e);
 			} finally {
+				System.out.println("[SEARCH]"+ "NAVER search " + curPage + "/" + maxPage + " done.");
 				saveAsXML(response.toString());
 				curPage++;
 				return response.toString(); // response 반환
@@ -166,12 +174,17 @@ public class NaverAPIManger {
 
 	public Boolean saveAsXML(String contents) {
 		boolean success = false;
+		String fileName;
 		try {
-			BufferedWriter out = new BufferedWriter(
-					new FileWriter("NAVER-" + query + "-" + curPage + "-" + maxPage + ".xml"));
+			
+			fileName = "NAVER-" + keyword + "-" + curPage + "-" + maxPage + ".xml";
+			FileOutputStream fos = new FileOutputStream(fileName);
+			OutputStreamWriter osw = new OutputStreamWriter(fos, "UTF-8");
+			BufferedWriter out = new BufferedWriter(osw);
 			out.write(contents);
 			out.close();
 			success = true;
+			System.out.println("[SAVE] :: " + fileName + " saved.");
 			return success;
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
