@@ -34,13 +34,14 @@ import com.opencsv.CSVWriter;
 
 import www.insighteye.zz.am.article.Article;
 
-public class DaumSearchManager {
-	private String url = "http://search.daum.net/search?w=news&cluster=n&req=tab&period=u&DA=STC"; // 검색
-	// URL
-	private SimpleDateFormat sd = new SimpleDateFormat("yyyyMMdd");
+public class NaverSearchManager {
+	private String url = "https://search.naver.com/search.naver?where=news&ie=utf8&photo=0&field=0&pd=3"; // 검색
+	// URL, field는 상의 필요
+	private SimpleDateFormat sd_org = new SimpleDateFormat("yyyyMMdd");
+	private SimpleDateFormat sd = new SimpleDateFormat("yyyy.MM.dd");
 	// 날짜 포맷, 수정 금지
-	final private int NUM = 50; // 기사 표시 개수
-	final private int SORT = 3; // 정렬방법, 1이 최신, 3이 정확도
+	final private int NUM = 10; // 기사 표시 개수
+	final private int SORT = 3; // 정렬방법, 0:관련 / 1:최신 / 2:오래된
 	private boolean done = false;
 
 	private String tempUrl;
@@ -66,9 +67,6 @@ public class DaumSearchManager {
 	private Date curSdate; // 현재 검색 시작일
 	private Date curEdate; // 현재 검색 종료일
 
-	private String stime = "000000";
-	private String etime = "235959";
-
 	private int page; // 현재 페이지 p
 	private int total; // 검색 건수
 	private int maxPage; // 최대 페이지
@@ -84,13 +82,12 @@ public class DaumSearchManager {
 
 	private ArrayList<Article> list; // 기사 csv 저장용 리스트
 
-	public DaumSearchManager(String sdate, String edate, int _term) {
+	public NaverSearchManager(String sdate, String edate, int _term) {
 		try {
 			list = new ArrayList<Article>();
-			startDate = sd.parse(sdate); // 최초일
-			endDate = sd.parse(edate); // 최종일
+			startDate = sd_org.parse(sdate); // 최초일
+			endDate = sd_org.parse(edate); // 최종일
 			term = _term; // 검색 텀 지정
-			url = url + "&n=" + NUM; // 페이지당 표시개수
 		} catch (ParseException e) {
 			System.out.println("Informal date format error!!");
 		}
@@ -116,7 +113,7 @@ public class DaumSearchManager {
 
 		try {
 			query = URLEncoder.encode(_keyword, "UTF-8");
-			tempUrl = url + "&q=" + query;
+			tempUrl = url + "&query=" + query + "&sort=" + SORT;
 
 			curSdate = startDate;
 			curEdate = addTerm(curSdate);
@@ -124,10 +121,11 @@ public class DaumSearchManager {
 			if (curEdate.after(endDate) && !done) {
 				curEdate = endDate;
 			}
-			tempUrl = tempUrl + "&sd=" + sd.format(curSdate) + stime + "&ed=" + sd.format(curEdate) + etime;
+
+			tempUrl = tempUrl + "&ds=" + sd.format(curSdate) + "&de=" + sd.format(curEdate);
 			System.out.println("시작일 : " + curSdate + " 종료일: " + curEdate);
 			System.out.println("시작일 포맷 : " + sd.format(curSdate) + " 종료일 포맷 : " + sd.format(curEdate));
-			System.out.println(tempUrl);
+			System.out.println("init url : " + tempUrl);
 
 			// Http 요청
 			entity = getEntity(tempUrl);
@@ -145,11 +143,11 @@ public class DaumSearchManager {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} finally {
-
+			// System.out.println(doc);
 			total = getTotal(doc);
 			setPage();
 			// 최대 페이지 수
-			page = 1;
+			page = 11;
 			prevSdate = curSdate; // 필요없음
 			prevEdate = curEdate;
 			// saveAsHTML(result);
@@ -160,14 +158,15 @@ public class DaumSearchManager {
 
 	private int getTotal(Document doc) {
 		try {
-			Elements elem = doc.select("span#resultCntArea");
-			Pattern pat = Pattern.compile("[0-9]*건");
+			Elements elem = doc.select("div.title_desc");
+			System.out.println(elem.toString());
+			Pattern pat = Pattern.compile("[0-9,]*건");
 			Matcher mat = pat.matcher(elem.text());
 			mat.find();
 
-			total = Integer.parseInt(mat.group().replaceAll("건", ""));
+			total = Integer.parseInt(mat.group().replaceAll("[건,]*", ""));
 			// 전체 검색 결과 개수
-			// System.out.println(total);
+			System.out.println("전체 건수 : " + total);
 		} catch (IllegalStateException e) {
 			total = 0;
 		}
@@ -177,9 +176,9 @@ public class DaumSearchManager {
 	public void saveAsCSV() {
 		String fileName;
 		if (path != null) {
-			fileName = path + "\\DAUM-" + keyword + ".csv";
+			fileName = path + "\\NAVER-" + keyword + ".csv";
 		} else {
-			fileName = "DAUM-" + keyword + ".csv";
+			fileName = "NAVER-" + keyword + ".csv";
 		}
 		FileOutputStream fos;
 		OutputStreamWriter osw;
@@ -236,13 +235,14 @@ public class DaumSearchManager {
 				// total 갱신
 			} else {
 				// 마지막 페이지가 아닌 경우, 페이지 증가 후 검색
-				page++;
+				page += 10;
 			}
 			if (renew)
 				tempUrl2 = tempUrl;
 			else
-				tempUrl2 = tempUrl + "&p=" + page; // 페이지
+				tempUrl2 = tempUrl + "&start=" + page; // 페이지
 			// Http 요청
+			System.out.println("renewed url : " + tempUrl2);
 			entity = getEntity(tempUrl2);
 			ContentType content = ContentType.getOrDefault(entity);
 			Charset charset = content.getCharset();
@@ -254,9 +254,7 @@ public class DaumSearchManager {
 			}
 			result = sb.toString();
 			doc = Jsoup.parse(result);
-		} catch (
-
-		UnsupportedEncodingException e) {
+		} catch (UnsupportedEncodingException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} catch (ClientProtocolException e) {
@@ -266,7 +264,6 @@ public class DaumSearchManager {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} finally {
-
 			if (renew) {
 				total = getTotal(doc);
 				setPage();
@@ -275,7 +272,6 @@ public class DaumSearchManager {
 			// saveAsHTML(result);
 			if (!done)
 				parseArticle(doc);
-
 			return doc;
 		}
 	}
@@ -290,26 +286,24 @@ public class DaumSearchManager {
 		System.out.println("시작일 : " + curSdate + " 종료일: " + curEdate);
 		System.out.println("시작일 포맷 : " + sd.format(curSdate) + " 종료일 포맷 : " + sd.format(curEdate));
 
-		if (curEdate.after(endDate)) {
+		if (curEdate.equals(endDate)) {
+			System.out.println("same");
+			curEdate = endDate;
+		} else if (curEdate.after(endDate)) {
 			curEdate = endDate;
 			done = true;
 		}
 		tempUrl = url + "&q=" + query;
-		tempUrl = tempUrl + "&sd=" + sd.format(curSdate) + stime + "&ed=" + sd.format(curEdate) + etime;
+		tempUrl = tempUrl + "&ds=" + sd.format(curSdate) + "&de=" + sd.format(curEdate);
+
+		System.out.println("Updated url : " + tempUrl);
 	}
 
 	private void setPage() {
 		// System.out.println(total);
-		maxPage = total / NUM;
+		// 네이버는 page를 기사 개수로 표시해야함(start지점으로)
+		maxPage = total;
 
-		if (total % NUM != 0) {
-			maxPage++;
-		}
-		if (maxPage > 80) {
-			System.out.println("!!!!!!!Page overflow. it's more than 80.");
-			System.out.println("Make term shorter than now");
-			maxPage = 80;
-		}
 		System.out.println("maxPage = " + maxPage);
 	}
 
@@ -328,47 +322,29 @@ public class DaumSearchManager {
 		return cal.getTime();
 	}
 
-	// private Boolean saveAsHTML(String contents) {
-	// @Deprecated
-	// // html 저장 미사용
-	// boolean success = false;
-	// String fileName;
-	// try {
-	//
-	// fileName = "DAUM-" + keyword + "-" + sd.format(curSdate) + "-" +
-	// sd.format(curEdate) + "-" + page + "-"
-	// + total + ".html";
-	// FileOutputStream fos = new FileOutputStream(fileName);
-	// OutputStreamWriter osw = new OutputStreamWriter(fos, "UTF-8");
-	// BufferedWriter out = new BufferedWriter(osw);
-	// out.write(contents);
-	// out.close();
-	// success = true;
-	// System.out.println("[SAVE] :: " + fileName + " saved.");
-	// return success;
-	// } catch (IOException e) {
-	// e.printStackTrace();
-	// }
-	// return success;
-	// }
-
 	private Boolean parseArticle(Document doc) {
 		boolean success = false;
 		Article art = null;
-		Elements divs = doc.select("div.cont_inner");
-		// System.out.println("size of div = " + divs.size());
+		Elements divs = doc.select("li[id^=sp_nws");
+		// css selector 사용, 더 유용한듯
+		// https://www.w3schools.com/cssref/css_selectors.asp
+		System.out.println("size of div = " + divs.size());
 		for (Element elem : divs) {
 			art = new Article();
-			art.setTitle(elem.select("div.wrap_tit a").get(0).text());
+			art.setTitle(elem.select("a._sp_each_title").get(0).text());
+			System.out.println("추출된 제목 : " + art.getTitle());
 			// 제목 추출
-			art.setDescription(elem.select("p.f_eb").get(0).text());
+			art.setDescription(elem.select("dd").get(1).text());
+			System.out.println("추출된 내용 : " + art.getDescription());
 			// 내용 추출
-			art.setDate(elem.select("span.f_nb").get(0).text().substring(0, 10));
+			art.setDate(elem.select("dd.txt_inline").get(0).ownText().substring(0, 10));
+			System.out.println("추출된 날짜 : " + art.getDate());
 			// 날짜 추출
-			art.setUrl(elem.select("div.wrap_tit a").get(0).attr("abs:href"));
+			art.setUrl(elem.select("a._sp_each_url").get(0).attr("abs:href"));
+			System.out.println("추출된 URL : " + art.getUrl());
 			// 링크 추출
-			art.setPublisher(elem.select("span.f_nb").get(0).text().substring(10).replaceAll("[|]", "")
-					.replaceAll("\uB2E4\uC74C\uB274\uC2A4", "").trim());
+			art.setPublisher(elem.select("span._sp_each_source").get(0).text());
+			System.out.println("추출된 언론사 : " + art.getPublisher());
 			// 언론사 추출
 
 			list.add(art);
@@ -384,7 +360,5 @@ public class DaumSearchManager {
 
 		return success;
 	}
-}
 
-// getTotal 등의 메소드에 로깅용 출력 추가 [getTotal()] : ~
-// finally는 return 전에 수행됨
+}

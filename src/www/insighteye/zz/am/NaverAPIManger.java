@@ -17,7 +17,6 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.Locale;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -42,6 +41,7 @@ public class NaverAPIManger {
 	private int curPage = 1; // 현재 페이지
 	private int maxPage; // 최대 페이지
 	private int total; // 최대 검색 결과
+	private String path; // 경로
 
 	private String keyword;
 	private String query; // 검색문 쿼리, URLEncoder로 UTF-8 인코딩 필요
@@ -250,8 +250,22 @@ public class NaverAPIManger {
 		return success;
 	}
 
+	public String getPath() {
+		return path;
+	}
+
+	public void setPath(String path) {
+		this.path = path;
+	}
+
 	public void saveAsCSV() {
-		String fileName = "NAVER-" + keyword + "-" + SORTING +".csv";
+		String fileName;
+		if (path != null) {
+			fileName = path + "\\NAVER-" + keyword + "-" + SORTING  + ".csv";
+		} else {
+			fileName = "NAVER-" + keyword + "-" + SORTING + ".csv";
+		}
+		
 		FileOutputStream fos;
 		OutputStreamWriter osw;
 		CSVWriter csv = null;
